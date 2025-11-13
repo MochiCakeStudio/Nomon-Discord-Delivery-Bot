@@ -1,0 +1,12 @@
+{
+  "owner_id": 801715004046704670,
+  "daily_posting_limits": {
+    "Monday": 20,
+    "Tuesday": 20,
+    "Wednesday": 20,
+    "Thursday": 20,
+    "Friday": 20,
+    "Saturday": 20,
+    "Sunday": 20
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "delivery_system": {
+    "allowed_servers": ["all"],
+    "description": "Delivery system commands available in all servers"
+  },
+  "embed_commands": {
+    "allowed_servers": ["1432721358445351002"],
+    "description": "Embed commands restricted to specific servers"
+  },
+  "logging_commands": {
+    "allowed_servers": ["1432721358445351002"],
+    "description": "Logging commands restricted to specific servers"
+  },
+  "server_messages": {
+    "allowed_servers": ["1432721358445351002"],
+    "description": "Server message commands restricted to specific servers"
+  },
+  "dev_commands": {
+    "allowed_servers": ["1432721358445351002"],
+    "description": "Dev commands restricted to specific servers"
+  },
+  "autoroles": {
+    "allowed_servers": ["1432721358445351002"],
+    "description": "Autorole commands restricted to specific servers"
+  },
+  "posting_system": {
+    "allowed_servers": ["1432721358445351002"],
+    "description": "Posting system commands restricted to specific servers"
+  },
+  "mail_system": {
+    "allowed_servers": ["1432721358445351002"],
+    "description": "Mail system commands restricted to specific servers"
+  },
+  "clear_commands": {
+    "allowed_servers": ["1432721358445351002"],
+    "description": "Clear message commands restricted to specific servers"
+  }
+}

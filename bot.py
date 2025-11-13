@@ -56,6 +56,8 @@ async def on_ready():
         print("Clear cog loaded successfully.")
         await bot.load_extension('cogs.help_cog')
         print("Help cog loaded successfully.")
+        await bot.load_extension('cogs.bump_cog')
+        print("Bump cog loaded successfully.")
         status = load_status()
         await bot.change_presence(activity=discord.Game(name=status))
         await bot.tree.sync()

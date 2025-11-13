@@ -1,0 +1,6 @@
+@echo off
+echo Waiting for bot to exit...
+timeout /t 2 /nobreak > nul
+echo Restarting bot...
+cd C:\Users\thela\OneDrive\Desktop\Discord Bots\Nomon Discord Delivery Bot\Nomon-Discord-Delivery-Bot
+python bot.py

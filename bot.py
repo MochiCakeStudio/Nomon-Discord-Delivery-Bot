@@ -46,10 +46,15 @@ async def on_ready():
         print("Help cog loaded successfully.")
         await bot.load_extension('cogs.bump_cog')
         print("Bump cog loaded successfully.")
+        await bot.load_extension('dev_commands')
+        print("Dev commands cog loaded successfully.")
+        await bot.load_extension('cogs.forum_bump_cog')
+        print("Forum bump cog loaded successfully.")
         status = load_status()
         await bot.change_presence(activity=discord.Game(name=status))
         await bot.tree.sync()
-        print("Slash commands synced successfully.")
+        synced_commands = [cmd.name for cmd in bot.tree.get_commands()]
+        print(f"Slash commands synced globally successfully. Synced commands: {synced_commands}")
     except Exception as e:
         print(f"Failed to load cogs or sync commands: {e}")
 

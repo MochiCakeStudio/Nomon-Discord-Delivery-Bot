@@ -33,6 +33,21 @@ try:
 except sqlite3.OperationalError:
     pass
 
+try:
+    cursor.execute('ALTER TABLE servers ADD COLUMN home_thread_id INTEGER')
+except sqlite3.OperationalError:
+    pass
+
+try:
+    cursor.execute('ALTER TABLE servers ADD COLUMN propagated_threads TEXT')  # JSON string
+except sqlite3.OperationalError:
+    pass
+
+try:
+    cursor.execute('ALTER TABLE servers ADD COLUMN last_bump_timestamp INTEGER DEFAULT 0')
+except sqlite3.OperationalError:
+    pass
+
 # Create whitelisted_servers table
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS whitelisted_servers (
@@ -49,6 +64,13 @@ cursor.execute('''
         PRIMARY KEY (hosting_server_id, advertised_server_id),
         FOREIGN KEY (hosting_server_id) REFERENCES servers (server_id),
         FOREIGN KEY (advertised_server_id) REFERENCES servers (server_id)
+    )
+''')
+
+# Create partner_servers table for GlobalPartnerRegistry
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS partner_servers (
+        guild_id INTEGER PRIMARY KEY
     )
 ''')
 

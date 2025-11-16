@@ -21,14 +21,17 @@ def load_status():
 async def on_ready():
     print(f"{bot.user.name} has awakened and is ready to go! ☁️꒰ঌ( •ө• )໒꒱")
     try:
-        # Add parent directory to path to find cogs
+        # Add current directory to path to find cogs
         import sys
-        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        if current_dir not in sys.path:
+            sys.path.insert(0, current_dir)
+
+        # Add parent directory to path to find cogs in ../cogs
+        parent_dir = os.path.dirname(current_dir)
         if parent_dir not in sys.path:
             sys.path.insert(0, parent_dir)
-        
-        await bot.load_extension('cogs.embed_cog')
-        print("Embed cog loaded successfully.")
+
         await bot.load_extension('cogs.logging_cog')
         print("Logging cog loaded successfully.")
         await bot.load_extension('cogs.server_messages_cog')
@@ -46,6 +49,8 @@ async def on_ready():
         print("Help cog loaded successfully.")
         await bot.load_extension('cogs.forum_bump_cog')
         print("Forum bump cog loaded successfully.")
+        await bot.load_extension('cogs.partner_cog')
+        print("Partner cog loaded successfully.")
         await bot.load_extension('dev_commands')
         print("Dev commands cog loaded successfully.")
         status = load_status()

@@ -49,8 +49,6 @@ async def on_ready():
         print("Help cog loaded successfully.")
         await bot.load_extension('cogs.forum_bump_cog')
         print("Forum bump cog loaded successfully.")
-        await bot.load_extension('cogs.partner_cog')
-        print("Partner cog loaded successfully.")
         await bot.load_extension('dev_commands')
         print("Dev commands cog loaded successfully.")
         status = load_status()

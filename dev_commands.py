@@ -142,10 +142,10 @@ class DevCommands(commands.Cog):
         # Get advertisements for whitelisted servers only
         ads = {}
         for sid in whitelisted:
-            cursor.execute('SELECT advertisement FROM servers WHERE server_id = ?', (sid,))
+            cursor.execute('SELECT server_name, advertisement, tags FROM servers WHERE server_id = ?', (sid,))
             ad = cursor.fetchone()
-            if ad and ad[0]:
-                ads[sid] = ad[0]
+            if ad and ad[1]:
+                ads[sid] = ad
 
         if not ads:
             await interaction.followup.send("❌ No advertisements found for whitelisted servers. Please set advertisements for servers first.", ephemeral=True)
@@ -167,27 +167,61 @@ class DevCommands(commands.Cog):
 
         conn.close()
 
-        # Sync ads: Post each ad to every other whitelisted server's partner thread
+        # Sync ads: Create new threads in each whitelisted server's forum for each ad
         synced = 0
+        skipped = 0
         errors = []
         for host_sid, thread_id in threads.items():
-            for ad_sid, ad_text in ads.items():
+            for ad_sid, (server_name, ad_text, tags) in ads.items():
                 if ad_sid == host_sid:
                     continue  # Skip own ad
+
+                # Check if this ad is already posted in this host server
+                conn = self.get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute('SELECT thread_id FROM global_partner_threads WHERE hosting_server_id = ? AND advertised_server_id = ?', (host_sid, ad_sid))
+                existing = cursor.fetchone()
+                conn.close()
+
+                if existing:
+                    skipped += 1
+                    continue  # Already exists, skip
+
                 try:
+                    # Get the forum channel from the thread
                     thread = await self.bot.fetch_channel(thread_id)
-                    if not thread:
-                        errors.append(f"Thread {thread_id} not found")
+                    if not thread or not hasattr(thread, 'parent'):
+                        errors.append(f"Thread {thread_id} not found or has no parent forum")
                         continue
-                    if not isinstance(thread, discord.Thread):
-                        errors.append(f"Channel {thread_id} is not a thread")
+
+                    forum = thread.parent
+                    if not isinstance(forum, discord.ForumChannel):
+                        errors.append(f"Parent of thread {thread_id} is not a forum")
                         continue
-                    await thread.send(ad_text)
+
+                    # Create new thread in the forum
+                    content = f"**{server_name}** (Server ID: {ad_sid})\n\n{ad_text}\n\n💌 Added to HoneyBun's Portal on {time.strftime('%m/%d/%Y', time.localtime(time.time()))}\n\nTags: {tags or 'None'}"
+                    applied_tags = [tag for tag in forum.available_tags if tag.name in (tags.split(',') if tags else [])]
+
+                    new_thread = await forum.create_thread(
+                        name=f"🌸 {server_name} — Partner Ad",
+                        content=content,
+                        applied_tags=applied_tags
+                    )
+
+                    # Record the new thread in global_partner_threads
+                    conn = self.get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute('INSERT INTO global_partner_threads (hosting_server_id, thread_id, advertised_server_id) VALUES (?, ?, ?)',
+                                   (host_sid, new_thread.thread.id, ad_sid))
+                    conn.commit()
+                    conn.close()
+
                     synced += 1
                 except Exception as e:
                     errors.append(f"Error syncing to {host_sid}: {e}")
 
-        message = f"✅ Synced {synced} advertisements across the network!"
+        message = f"✅ Created {synced} new partner threads across the network!"
         if errors:
             message += f"\n⚠️ Errors encountered: {len(errors)}"
             for error in errors[:5]:  # Limit to first 5 errors to avoid message length limit

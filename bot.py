@@ -32,8 +32,8 @@ async def on_ready():
         if parent_dir not in sys.path:
             sys.path.insert(0, parent_dir)
 
-        await bot.load_extension('cogs.logging_cog')
-        print("Logging cog loaded successfully.")
+        await bot.load_extension('cogs.nomon_logs_cog')
+        print("Nomon logs cog loaded successfully.")
         await bot.load_extension('cogs.server_messages_cog')
         print("Server messages cog loaded successfully.")
         await bot.load_extension('cogs.dev_cog')
@@ -61,32 +61,6 @@ async def on_ready():
 
 
 
-@bot.event
-async def on_member_join(member):
-    logging_cog = bot.get_cog('LoggingCog')
-    if logging_cog:
-        await logging_cog.log_event(member.guild, f"👋 {member.mention} joined the server.")
 
-@bot.event
-async def on_member_remove(member):
-    logging_cog = bot.get_cog('LoggingCog')
-    if logging_cog:
-        await logging_cog.log_event(member.guild, f"👋 {member.mention} left the server.")
-
-@bot.event
-async def on_message_delete(message):
-    if message.author.bot:
-        return
-    logging_cog = bot.get_cog('LoggingCog')
-    if logging_cog:
-        await logging_cog.log_event(message.guild, f"🗑️ Message by {message.author.mention} deleted in {message.channel.mention}: {message.content[:100]}{'...' if len(message.content) > 100 else ''}")
-
-@bot.event
-async def on_message_edit(before, after):
-    if before.author.bot or before.content == after.content:
-        return
-    logging_cog = bot.get_cog('LoggingCog')
-    if logging_cog:
-        await logging_cog.log_event(before.guild, f"✏️ Message by {before.author.mention} edited in {before.channel.mention}:\n**Before:** {before.content[:100]}{'...' if len(before.content) > 100 else ''}\n**After:** {after.content[:100]}{'...' if len(after.content) > 100 else ''}")
 
 bot.run(TOKEN)

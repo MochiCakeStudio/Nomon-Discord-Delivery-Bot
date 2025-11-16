@@ -74,6 +74,16 @@ cursor.execute('''
     )
 ''')
 
+# Create sync_logs table for Nomon logs
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS sync_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp INTEGER NOT NULL,
+        synced_count INTEGER DEFAULT 0,
+        errors_count INTEGER DEFAULT 0
+    )
+''')
+
 conn.commit()
 conn.close()
 

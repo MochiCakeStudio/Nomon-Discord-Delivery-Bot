@@ -1,12 +1,5 @@
 {
-  "owner_id": 801715004046704670,
-  "daily_posting_limits": {
-    "Monday": 20,
-    "Tuesday": 20,
-    "Wednesday": 20,
-    "Thursday": 20,
-    "Friday": 20,
-    "Saturday": 20,
-    "Sunday": 20
-  }
+    "discord_bot_token": "YOUR_TOKEN_HERE",
+    "main_server_id": 1432721358445351002,
+    "nomon_log_channel_id": 1439738163403686060
 }

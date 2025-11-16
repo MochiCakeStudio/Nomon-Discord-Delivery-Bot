@@ -221,6 +221,11 @@ class DevCommands(commands.Cog):
                 except Exception as e:
                     errors.append(f"Error syncing to {host_sid}: {e}")
 
+        # Log the sync event
+        nomon_logs_cog = self.bot.get_cog('NomonLogsCog')
+        if nomon_logs_cog:
+            await nomon_logs_cog.log_network_sync(synced, len(errors))
+
         message = f"✅ Created {synced} new partner threads across the network!"
         if errors:
             message += f"\n⚠️ Errors encountered: {len(errors)}"

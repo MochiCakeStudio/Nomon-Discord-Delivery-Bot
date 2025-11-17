@@ -35,7 +35,7 @@ async def on_ready():
 
             await nomon_logs_cog.log_nomon_event(
                 f"🧪 **Test Event**\n**Server:** {fake_guild.name} ({fake_guild.id})\n**Test:** Logging simulation successful",
-                0x00ff00  # Green color for success
+                0xBEECCD  # Green color for success
             )
             print("✅ log_nomon_event called successfully!")
         except Exception as e:

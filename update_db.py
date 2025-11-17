@@ -48,6 +48,11 @@ try:
 except sqlite3.OperationalError:
     pass
 
+try:
+    cursor.execute('ALTER TABLE servers ADD COLUMN invite_url TEXT')
+except sqlite3.OperationalError:
+    pass
+
 # Create whitelisted_servers table
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS whitelisted_servers (

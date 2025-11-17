@@ -32,16 +32,10 @@ async def on_ready():
         if parent_dir not in sys.path:
             sys.path.insert(0, parent_dir)
 
-        await bot.load_extension('cogs.nomon_logs_cog')
-        print("Nomon logs cog loaded successfully.")
-        await bot.load_extension('cogs.server_messages_cog')
-        print("Server messages cog loaded successfully.")
         await bot.load_extension('cogs.dev_cog')
         print("Dev cog loaded successfully.")
         await bot.load_extension('cogs.mail_cog')
         print("Mail cog loaded successfully.")
-        await bot.load_extension('cogs.autoroles_cog')
-        print("Autoroles cog loaded successfully.")
 
         await bot.load_extension('cogs.clear_cog')
         print("Clear cog loaded successfully.")

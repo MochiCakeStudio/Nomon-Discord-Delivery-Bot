@@ -69,174 +69,25 @@ class DevCommands(commands.Cog):
             return
 
         embed = discord.Embed(
-            title="🍯 Developers",
+            title="👨‍💻 Developers",
             description=f"Total devs: {len(devs)}",
             color=0xf9d6c1
         )
 
         dev_list = ""
-        for (user_id,) in devs:
-            user = self.bot.get_user(user_id)
+        for dev_id, in devs:
+            user = self.bot.get_user(dev_id)
             if user:
-                dev_list += f"• {user.mention} ({user_id})\n"
+                dev_list += f"• {user.mention} ({user.id})\n"
             else:
-                dev_list += f"• Unknown User ({user_id})\n"
+                dev_list += f"• Unknown User ({dev_id})\n"
 
         embed.add_field(name="Developers", value=dev_list[:1024], inline=False)
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name='view_whitelisted_servers', description='View all whitelisted servers (Dev only)')
-    async def view_whitelisted_servers(self, interaction: discord.Interaction):
-        if not self.is_dev(interaction.user.id):
-            await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
-            return
-
-        try:
-            with open('server_permissions.json', 'r') as f:
-                permissions = json.load(f)
-        except FileNotFoundError:
-            await interaction.response.send_message("❌ server_permissions.json not found.", ephemeral=True)
-            return
-        except json.JSONDecodeError:
-            await interaction.response.send_message("❌ Error reading server_permissions.json.", ephemeral=True)
-            return
-
-        embed = discord.Embed(
-            title="🛡️ Whitelisted Servers",
-            description="List of whitelisted servers for each system",
-            color=0xf9d6c1
-        )
-
-        for category, data in permissions.items():
-            allowed_servers = data.get('allowed_servers', [])
-            description = data.get('description', 'No description')
-            if allowed_servers == ["all"]:
-                server_list = "All servers"
-            else:
-                server_list = ', '.join(allowed_servers) if allowed_servers else "None"
-            embed.add_field(name=f"{category.replace('_', ' ').title()}", value=f"**Servers:** {server_list}\n**Description:** {description}", inline=False)
-
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @app_commands.command(name='dev_sync_network', description='Sync advertisements across the network (Dev only)')
-    async def dev_sync_network(self, interaction: discord.Interaction):
-        if not self.is_dev(interaction.user.id):
-            await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
-            return
-
-        await interaction.response.defer()
-
-        conn = self.get_db_connection()
-        cursor = conn.cursor()
-
-        # Get whitelisted servers
-        cursor.execute('SELECT server_id FROM whitelisted_servers')
-        whitelisted = [row[0] for row in cursor.fetchall()]
-
-        if not whitelisted:
-            await interaction.followup.send("❌ No whitelisted servers found. Please add servers to the whitelist first.", ephemeral=True)
-            conn.close()
-            return
-
-        # Get advertisements for whitelisted servers only
-        ads = {}
-        for sid in whitelisted:
-            cursor.execute('SELECT server_name, advertisement, tags FROM servers WHERE server_id = ?', (sid,))
-            ad = cursor.fetchone()
-            if ad and ad[1]:
-                ads[sid] = ad
-
-        if not ads:
-            await interaction.followup.send("❌ No advertisements found for whitelisted servers. Please set advertisements for servers first.", ephemeral=True)
-            conn.close()
-            return
-
-        # Get partner threads for whitelisted servers only
-        threads = {}
-        for sid in whitelisted:
-            cursor.execute('SELECT thread_id FROM partner_threads WHERE server_id = ?', (sid,))
-            t = cursor.fetchone()
-            if t:
-                threads[sid] = t[0]
-
-        if not threads:
-            await interaction.followup.send("❌ No partner threads found for whitelisted servers. Please set partner threads first.", ephemeral=True)
-            conn.close()
-            return
-
-        conn.close()
-
-        # Sync ads: Create new threads in each whitelisted server's forum for each ad
-        synced = 0
-        skipped = 0
-        errors = []
-        for host_sid, thread_id in threads.items():
-            for ad_sid, (server_name, ad_text, tags) in ads.items():
-                if ad_sid == host_sid:
-                    continue  # Skip own ad
-
-                # Check if this ad is already posted in this host server
-                conn = self.get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute('SELECT thread_id FROM global_partner_threads WHERE hosting_server_id = ? AND advertised_server_id = ?', (host_sid, ad_sid))
-                existing = cursor.fetchone()
-                conn.close()
-
-                if existing:
-                    skipped += 1
-                    continue  # Already exists, skip
-
-                try:
-                    # Get the forum channel from the thread
-                    thread = await self.bot.fetch_channel(thread_id)
-                    if not thread or not hasattr(thread, 'parent'):
-                        errors.append(f"Thread {thread_id} not found or has no parent forum")
-                        continue
-
-                    forum = thread.parent
-                    if not isinstance(forum, discord.ForumChannel):
-                        errors.append(f"Parent of thread {thread_id} is not a forum")
-                        continue
-
-                    # Create new thread in the forum
-                    content = f"**{server_name}** (Server ID: {ad_sid})\n\n{ad_text}\n\n💌 Added to HoneyBun's Portal on {time.strftime('%m/%d/%Y', time.localtime(time.time()))}\n\nTags: {tags or 'None'}"
-                    applied_tags = [tag for tag in forum.available_tags if tag.name in (tags.split(',') if tags else [])]
-
-                    new_thread = await forum.create_thread(
-                        name=f"🌸 {server_name} — Partner Ad",
-                        content=content,
-                        applied_tags=applied_tags
-                    )
-
-                    # Record the new thread in global_partner_threads
-                    conn = self.get_db_connection()
-                    cursor = conn.cursor()
-                    cursor.execute('INSERT INTO global_partner_threads (hosting_server_id, thread_id, advertised_server_id) VALUES (?, ?, ?)',
-                                   (host_sid, new_thread.thread.id, ad_sid))
-                    conn.commit()
-                    conn.close()
-
-                    synced += 1
-                except Exception as e:
-                    errors.append(f"Error syncing to {host_sid}: {e}")
-
-        # Log the sync event
-        nomon_logs_cog = self.bot.get_cog('NomonLogsCog')
-        if nomon_logs_cog:
-            await nomon_logs_cog.log_network_sync(synced, len(errors))
-
-        message = f"✅ Created {synced} new partner threads across the network!"
-        if errors:
-            message += f"\n⚠️ Errors encountered: {len(errors)}"
-            for error in errors[:5]:  # Limit to first 5 errors to avoid message length limit
-                message += f"\n- {error}"
-
-        await interaction.followup.send(message, ephemeral=True)
-
-    @app_commands.command(name='bump_test', description='Test bump sync to a specific server (Dev only)')
-    @app_commands.describe(server_id='The server ID to test sync for')
-    async def bump_test(self, interaction: discord.Interaction, server_id: str):
+    @app_commands.command(name='whitelist_server', description='Add a server to the whitelist (Dev only)')
+    async def whitelist_server(self, interaction: discord.Interaction, server_id: str):
         if not self.is_dev(interaction.user.id):
             await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
             return
@@ -247,83 +98,15 @@ class DevCommands(commands.Cog):
             await interaction.response.send_message("❌ Invalid server ID.", ephemeral=True)
             return
 
-        await interaction.response.defer()
-
         conn = self.get_db_connection()
         cursor = conn.cursor()
-
-        # Check if the test server is whitelisted
-        cursor.execute('SELECT server_id FROM whitelisted_servers WHERE server_id = ?', (sid,))
-        if not cursor.fetchone():
-            await interaction.followup.send("❌ The specified server is not whitelisted. Only whitelisted servers can be tested.", ephemeral=True)
-            conn.close()
-            return
-
-        # Get server data for the test server
-        cursor.execute('SELECT server_name, advertisement, tags FROM servers WHERE server_id = ?', (sid,))
-        server_data = cursor.fetchone()
-        if not server_data or not server_data[1]:
-            await interaction.followup.send("❌ No advertisement found for that server.", ephemeral=True)
-            conn.close()
-            return
-
-        server_name, advertisement, tags = server_data
-
-        # Get the test server's own partner thread
-        cursor.execute('SELECT thread_id FROM partner_threads WHERE server_id = ?', (sid,))
-        own_thread = cursor.fetchone()
-
-        # Get all global partner threads where this server's ad is advertised
-        cursor.execute('SELECT thread_id FROM global_partner_threads WHERE advertised_server_id = ?', (sid,))
-        global_threads = cursor.fetchall()
+        cursor.execute('INSERT OR IGNORE INTO whitelisted_servers (server_id) VALUES (?)', (sid,))
+        conn.commit()
         conn.close()
 
-        threads_to_post = []
-        if own_thread:
-            threads_to_post.append((sid, own_thread[0]))
-        threads_to_post.extend([(sid, t[0]) for t in global_threads])
-
-        if not threads_to_post:
-            await interaction.followup.send("❌ No partner threads found for this server to test against.", ephemeral=True)
-            return
-
-        # Create bump embed matching Nomon's aesthetic
-        embed = discord.Embed(
-            title=f"{server_name} — Partner Ad",
-            description=f"{advertisement}\n\n✨ This server was recently bumped!\n⏰ <t:{int(time.time())}:R>\n\n(づ๑•ᴗ•๑)づ♡ Delivering a fresh bump across the network...",
-            color=0xffc0cb
-        )
-        if tags:
-            embed.add_field(name="Tags", value=tags, inline=False)
-        embed.set_footer(text="Nomon's gentle wings delivered this bump 🍄")
-
-        # Post test sync to all relevant threads
-        posted = 0
-        errors = []
-        for host_sid, thread_id in threads_to_post:
-            try:
-                thread = await self.bot.fetch_channel(thread_id)
-                if not thread:
-                    errors.append(f"Thread {thread_id} not found")
-                    continue
-                if not isinstance(thread, discord.Thread):
-                    errors.append(f"Channel {thread_id} is not a thread")
-                    continue
-                await thread.send(embed=embed)
-                posted += 1
-            except Exception as e:
-                errors.append(f"Error posting test to {host_sid}: {e}")
-
-        message = f"✅ Test posted {posted} times!"
-        if errors:
-            message += f"\n⚠️ Errors encountered: {len(errors)}"
-            for error in errors[:5]:  # Limit to first 5 errors
-                message += f"\n- {error}"
-
-        await interaction.followup.send(message, ephemeral=True)
+        await interaction.response.send_message(f"✅ Server {sid} has been whitelisted.", ephemeral=True)
 
     @app_commands.command(name='remove_server', description='Remove a server from the network (Dev only)')
-    @app_commands.describe(server_id='The server ID to remove from the network')
     async def remove_server(self, interaction: discord.Interaction, server_id: str):
         if not self.is_dev(interaction.user.id):
             await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
@@ -338,7 +121,7 @@ class DevCommands(commands.Cog):
         conn = self.get_db_connection()
         cursor = conn.cursor()
 
-        # Check if server exists in whitelisted_servers
+        # Check if server is whitelisted
         cursor.execute('SELECT server_id FROM whitelisted_servers WHERE server_id = ?', (sid,))
         if not cursor.fetchone():
             await interaction.response.send_message("❌ Server is not whitelisted.", ephemeral=True)
@@ -395,6 +178,159 @@ class DevCommands(commands.Cog):
         embed.add_field(name="Servers", value=server_list[:1024], inline=False)
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name='sync_commands', description='Sync slash commands globally (Dev only)')
+    async def sync_commands(self, interaction: discord.Interaction):
+        if not self.is_dev(interaction.user.id):
+            await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            await self.bot.tree.sync()
+            synced_commands = [cmd.name for cmd in self.bot.tree.get_commands()]
+            await interaction.followup.send(f"✅ Slash commands synced globally. Synced commands: {', '.join(synced_commands)}", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Failed to sync commands: {e}", ephemeral=True)
+
+    @app_commands.command(name='reload_cog', description='Reload a specific cog (Dev only)')
+    async def reload_cog(self, interaction: discord.Interaction, cog_name: str):
+        if not self.is_dev(interaction.user.id):
+            await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            await self.bot.reload_extension(cog_name)
+            await interaction.followup.send(f"✅ Reloaded cog: {cog_name}", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ Failed to reload cog {cog_name}: {e}", ephemeral=True)
+
+    @app_commands.command(name='dev_sync', description='Sync a server\'s forum with the network (Dev only)')
+    async def dev_sync(self, interaction: discord.Interaction, server_id: str):
+        if not self.is_dev(interaction.user.id):
+            await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
+            return
+
+        try:
+            sid = int(server_id)
+        except ValueError:
+            await interaction.response.send_message("❌ Invalid server ID.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if server is registered
+        cursor.execute('SELECT forum_channel_id, server_name, advertisement, tags, invite_url FROM servers WHERE server_id = ?', (sid,))
+        server_data = cursor.fetchone()
+        if not server_data:
+            conn.close()
+            await interaction.followup.send("❌ Server is not registered.", ephemeral=True)
+            return
+
+        forum_id, server_name, advertisement, tags_str, invite_url = server_data
+        tags = tags_str.split(',') if tags_str else []
+
+        # Get all other registered servers
+        cursor.execute('SELECT server_id, forum_channel_id FROM servers WHERE server_id != ?', (sid,))
+        other_servers = cursor.fetchall()
+        conn.close()
+
+        synced_threads = 0
+
+        # Create threads in the target server's forum for all other servers (if missing)
+        try:
+            forum = await self.bot.fetch_channel(forum_id)
+            if forum:
+                for other_sid, other_forum_id in other_servers:
+                    # Check if thread already exists
+                    conn = self.get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute('SELECT thread_id FROM global_partner_threads WHERE hosting_server_id = ? AND advertised_server_id = ?', (sid, other_sid))
+                    existing_thread = cursor.fetchone()
+                    conn.close()
+
+                    if existing_thread:
+                        continue  # Skip if already exists
+
+                    # Get other server's data
+                    conn = self.get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute('SELECT server_name, advertisement, tags, invite_url FROM servers WHERE server_id = ?', (other_sid,))
+                    other_data = cursor.fetchone()
+                    conn.close()
+
+                    if other_data:
+                        other_name, other_ad, other_tags_str, other_invite = other_data
+                        other_tags = other_tags_str.split(',') if other_tags_str else []
+
+                        join_text = f"[Join Server]({other_invite})" if other_invite else f"Server ID: {other_sid}"
+                        content = f"**{other_name}** ({join_text})\n\n{other_ad}\n\n💌 Added to HoneyBun's Portal on {time.strftime('%m/%d/%Y', time.localtime(time.time()))}\n\nTags: {', '.join(other_tags) if other_tags else 'None'}"
+                        applied_tags = [tag for tag in forum.available_tags if tag.name in other_tags]
+
+                        thread = await forum.create_thread(
+                            name=f"🌸 {other_name} — Partner Ad",
+                            content=content,
+                            applied_tags=applied_tags
+                        )
+
+                        # Save to DB
+                        conn = self.get_db_connection()
+                        cursor = conn.cursor()
+                        cursor.execute('INSERT INTO global_partner_threads (hosting_server_id, thread_id, advertised_server_id) VALUES (?, ?, ?)',
+                                       (sid, thread.thread.id, other_sid))
+                        conn.commit()
+                        conn.close()
+
+                        synced_threads += 1
+                        await asyncio.sleep(1)  # Rate limit
+        except Exception as e:
+            print(f"Error syncing threads to {sid}: {e}")
+
+        # Create threads in other servers' forums for this server (if missing)
+        for other_sid, other_forum_id in other_servers:
+            try:
+                other_forum = await self.bot.fetch_channel(other_forum_id)
+                if not other_forum:
+                    continue
+
+                # Check if thread already exists
+                conn = self.get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute('SELECT thread_id FROM global_partner_threads WHERE hosting_server_id = ? AND advertised_server_id = ?', (other_sid, sid))
+                existing_thread = cursor.fetchone()
+                conn.close()
+
+                if existing_thread:
+                    continue  # Skip if already exists
+
+                join_text = f"[Join Server]({invite_url})" if invite_url else f"Server ID: {sid}"
+                content = f"**{server_name}** ({join_text})\n\n{advertisement}\n\n💌 Added to Nomons's Cottage on {time.strftime('%m/%d/%Y', time.localtime(time.time()))}\n\nTags: {', '.join(tags) if tags else 'None'}"
+                applied_tags = [tag for tag in other_forum.available_tags if tag.name in tags]
+
+                thread = await other_forum.create_thread(
+                    name=f"🌸 {server_name} — Partner Ad",
+                    content=content,
+                    applied_tags=applied_tags
+                )
+
+                # Save to DB
+                conn = self.get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute('INSERT INTO global_partner_threads (hosting_server_id, thread_id, advertised_server_id) VALUES (?, ?, ?)',
+                               (other_sid, thread.thread.id, sid))
+                conn.commit()
+                conn.close()
+
+                synced_threads += 1
+                await asyncio.sleep(1)  # Rate limit
+            except Exception as e:
+                print(f"Error syncing thread for {sid} in {other_sid}: {e}")
+
+        await interaction.followup.send(f"✅ Synced {synced_threads} threads for server {sid}.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(DevCommands(bot))

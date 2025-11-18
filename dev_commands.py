@@ -10,6 +10,7 @@ class DevCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db_path = 'databases/bump.db'
+        self.STATUS_FILE = "status.txt"
 
     def get_db_connection(self):
         return sqlite3.connect(self.db_path)
@@ -179,32 +180,22 @@ class DevCommands(commands.Cog):
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name='sync_commands', description='Sync slash commands globally (Dev only)')
-    async def sync_commands(self, interaction: discord.Interaction):
+    @app_commands.command(name='set_status', description='Set the bot\'s status message (Dev only)')
+    @app_commands.describe(
+        status="The new status message for the bot"
+    )
+    async def slash_set_status(self, interaction: discord.Interaction, status: str):
         if not self.is_dev(interaction.user.id):
             await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
             return
 
-        await interaction.response.defer(ephemeral=True)
         try:
-            await self.bot.tree.sync()
-            synced_commands = [cmd.name for cmd in self.bot.tree.get_commands()]
-            await interaction.followup.send(f"✅ Slash commands synced globally. Synced commands: {', '.join(synced_commands)}", ephemeral=True)
+            with open(self.STATUS_FILE, "w") as f:
+                f.write(status)
+            await self.bot.change_presence(activity=discord.Game(name=status))
+            await interaction.response.send_message("Status updated successfully!", ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f"❌ Failed to sync commands: {e}", ephemeral=True)
-
-    @app_commands.command(name='reload_cog', description='Reload a specific cog (Dev only)')
-    async def reload_cog(self, interaction: discord.Interaction, cog_name: str):
-        if not self.is_dev(interaction.user.id):
-            await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
-            return
-
-        await interaction.response.defer(ephemeral=True)
-        try:
-            await self.bot.reload_extension(cog_name)
-            await interaction.followup.send(f"✅ Reloaded cog: {cog_name}", ephemeral=True)
-        except Exception as e:
-            await interaction.followup.send(f"❌ Failed to reload cog {cog_name}: {e}", ephemeral=True)
+            await interaction.response.send_message(f"Error: {e}", ephemeral=True)
 
     @app_commands.command(name='dev_sync', description='Sync a server\'s forum with the network (Dev only)')
     async def dev_sync(self, interaction: discord.Interaction, server_id: str):

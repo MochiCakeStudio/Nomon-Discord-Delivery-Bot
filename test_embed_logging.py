@@ -7,8 +7,8 @@ import asyncio
 async def test():
     bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
     try:
-        await bot.load_extension('cogs.logging_cog')
-        print("Logging cog loaded successfully.")
+        await bot.load_extension('cogs.nomon_logs_cog')
+        print("Nomon logs cog loaded successfully.")
         await bot.load_extension('cogs.embed_cog')
         print("Embed cog loaded successfully.")
     except Exception as e:

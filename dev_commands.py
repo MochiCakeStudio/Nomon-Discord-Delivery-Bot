@@ -2,9 +2,9 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import sqlite3
-import os
-import json
+import asyncio
 import time
+
 
 class DevCommands(commands.Cog):
     def __init__(self, bot):
@@ -23,7 +23,10 @@ class DevCommands(commands.Cog):
         conn.close()
         return result is not None
 
-    @app_commands.command(name='add_dev', description='Add a user to the dev list (Owner only)')
+    @app_commands.command(
+        name='add_dev',
+        description='Add a user to the dev list (Owner only)'
+    )
     async def add_dev(self, interaction: discord.Interaction, user: discord.User):
         # Check if user is bot owner
         if interaction.user.id != self.bot.owner_id:
@@ -38,7 +41,10 @@ class DevCommands(commands.Cog):
 
         await interaction.response.send_message(f"✅ {user.mention} has been added to the dev list.", ephemeral=True)
 
-    @app_commands.command(name='remove_dev', description='Remove a user from the dev list (Owner only)')
+    @app_commands.command(
+        name='remove_dev',
+        description='Remove a user from the dev list (Owner only)'
+    )
     async def remove_dev(self, interaction: discord.Interaction, user: discord.User):
         # Check if user is bot owner
         if interaction.user.id != self.bot.owner_id:
@@ -53,7 +59,10 @@ class DevCommands(commands.Cog):
 
         await interaction.response.send_message(f"✅ {user.mention} has been removed from the dev list.", ephemeral=True)
 
-    @app_commands.command(name='list_devs', description='List all developers (Dev only)')
+    @app_commands.command(
+        name='list_devs',
+        description='List all developers (Dev only)'
+    )
     async def list_devs(self, interaction: discord.Interaction):
         if not self.is_dev(interaction.user.id):
             await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
@@ -87,7 +96,10 @@ class DevCommands(commands.Cog):
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name='whitelist_server', description='Add a server to the whitelist (Dev only)')
+    @app_commands.command(
+        name='whitelist_server',
+        description='Add a server to the whitelist (Dev only)'
+    )
     async def whitelist_server(self, interaction: discord.Interaction, server_id: str):
         if not self.is_dev(interaction.user.id):
             await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
@@ -107,7 +119,10 @@ class DevCommands(commands.Cog):
 
         await interaction.response.send_message(f"✅ Server {sid} has been whitelisted.", ephemeral=True)
 
-    @app_commands.command(name='remove_server', description='Remove a server from the network (Dev only)')
+    @app_commands.command(
+        name='remove_server',
+        description='Remove a server from the network (Dev only)'
+    )
     async def remove_server(self, interaction: discord.Interaction, server_id: str):
         if not self.is_dev(interaction.user.id):
             await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
@@ -146,7 +161,10 @@ class DevCommands(commands.Cog):
 
         await interaction.response.send_message(f"✅ Server {sid} has been removed from the network.", ephemeral=True)
 
-    @app_commands.command(name='list_servers', description='List all registered servers (Dev only)')
+    @app_commands.command(
+        name='list_servers',
+        description='List all registered servers (Dev only)'
+    )
     async def list_servers(self, interaction: discord.Interaction):
         if not self.is_dev(interaction.user.id):
             await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
@@ -180,7 +198,10 @@ class DevCommands(commands.Cog):
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name='set_status', description='Set the bot\'s status message (Dev only)')
+    @app_commands.command(
+        name='set_status',
+        description='Set the bot\'s status message (Dev only)'
+    )
     @app_commands.describe(
         status="The new status message for the bot"
     )
@@ -197,7 +218,10 @@ class DevCommands(commands.Cog):
         except Exception as e:
             await interaction.response.send_message(f"Error: {e}", ephemeral=True)
 
-    @app_commands.command(name='dev_sync', description='Sync a server\'s forum with the network (Dev only)')
+    @app_commands.command(
+        name='dev_sync',
+        description='Sync a server\'s forum with the network (Dev only)'
+    )
     async def dev_sync(self, interaction: discord.Interaction, server_id: str):
         if not self.is_dev(interaction.user.id):
             await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
@@ -322,6 +346,58 @@ class DevCommands(commands.Cog):
                 print(f"Error syncing thread for {sid} in {other_sid}: {e}")
 
         await interaction.followup.send(f"✅ Synced {synced_threads} threads for server {sid}.", ephemeral=True)
+
+    @app_commands.command(
+        name='delete_all_threads',
+        description='Delete all partner threads in the network (Dev only - Destructive)'
+    )
+    async def delete_all_threads(self, interaction: discord.Interaction):
+        if not self.is_dev(interaction.user.id):
+            await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+
+        # Get all thread IDs from global_partner_threads
+        cursor.execute('SELECT thread_id FROM global_partner_threads')
+        thread_ids = [row[0] for row in cursor.fetchall()]
+
+        # Also get partner_threads if any
+        cursor.execute('SELECT thread_id FROM partner_threads')
+        partner_thread_ids = [row[0] for row in cursor.fetchall()]
+
+        all_thread_ids = set(thread_ids + partner_thread_ids)
+
+        deleted_count = 0
+        failed_count = 0
+
+        for thread_id in all_thread_ids:
+            try:
+                thread = await self.bot.fetch_channel(thread_id)
+                if isinstance(thread, discord.Thread):
+                    await thread.delete()
+                    deleted_count += 1
+                else:
+                    failed_count += 1
+                    print(f"Channel {thread_id} is not a thread")
+            except discord.NotFound:
+                # Thread already deleted or doesn't exist
+                pass
+            except Exception as e:
+                failed_count += 1
+                print(f"Error deleting thread {thread_id}: {e}")
+            await asyncio.sleep(0.5)  # Rate limit
+
+        # Clear the database tables
+        cursor.execute('DELETE FROM global_partner_threads')
+        cursor.execute('DELETE FROM partner_threads')
+        conn.commit()
+        conn.close()
+
+        await interaction.followup.send(f"✅ Deleted {deleted_count} threads. {failed_count} failed or skipped.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(DevCommands(bot))

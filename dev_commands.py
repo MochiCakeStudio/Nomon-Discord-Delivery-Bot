@@ -163,36 +163,28 @@ class DevCommands(commands.Cog):
 
     @app_commands.command(
         name='list_servers',
-        description='List all registered servers (Dev only)'
+        description='List all servers the bot is currently in (Dev only)'
     )
     async def list_servers(self, interaction: discord.Interaction):
         if not self.is_dev(interaction.user.id):
             await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
             return
 
-        conn = self.get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('SELECT server_id, server_name, advertisement, tags FROM servers')
-        servers = cursor.fetchall()
-        conn.close()
+        guilds = self.bot.guilds
 
-        if not servers:
-            await interaction.response.send_message("💤 No servers registered yet!", ephemeral=True)
+        if not guilds:
+            await interaction.response.send_message("💤 The bot is not in any servers!", ephemeral=True)
             return
 
         embed = discord.Embed(
-            title="🌐 Registered Servers",
-            description=f"Total servers: {len(servers)}",
+            title="🌐 Servers the Bot is In",
+            description=f"Total servers: {len(guilds)}",
             color=0xf9d6c1
         )
 
         server_list = ""
-        for server_id, server_name, advertisement, tags in servers:
-            name = server_name or f"Server {server_id}"
-            server_list += f"• **{name}** ({server_id})\n"
-            if tags:
-                server_list += f"  Tags: {tags}\n"
-            server_list += "\n"
+        for guild in guilds:
+            server_list += f"• **{guild.name}** ({guild.id}) - {guild.member_count} members\n"
 
         embed.add_field(name="Servers", value=server_list[:1024], inline=False)
 
@@ -346,6 +338,43 @@ class DevCommands(commands.Cog):
                 print(f"Error syncing thread for {sid} in {other_sid}: {e}")
 
         await interaction.followup.send(f"✅ Synced {synced_threads} threads for server {sid}.", ephemeral=True)
+
+    @app_commands.command(
+        name='view_whitelisted_servers',
+        description='Show all approved (whitelisted) servers (Dev only)'
+    )
+    async def view_whitelisted_servers(self, interaction: discord.Interaction):
+        if not self.is_dev(interaction.user.id):
+            await interaction.response.send_message("❌ This command is for developers only.", ephemeral=True)
+            return
+
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT server_id FROM whitelisted_servers')
+        whitelisted = cursor.fetchall()
+        conn.close()
+
+        if not whitelisted:
+            await interaction.response.send_message("💤 No servers whitelisted yet!", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title="✅ Approved Servers",
+            description=f"Total whitelisted servers: {len(whitelisted)}",
+            color=0xf9d6c1
+        )
+
+        server_list = ""
+        for server_id, in whitelisted:
+            guild = self.bot.get_guild(server_id)
+            if guild:
+                server_list += f"• **{guild.name}** ({server_id})\n"
+            else:
+                server_list += f"• Unknown Server ({server_id})\n"
+
+        embed.add_field(name="Whitelisted Servers", value=server_list[:1024], inline=False)
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
         name='delete_all_threads',

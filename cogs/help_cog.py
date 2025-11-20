@@ -81,12 +81,12 @@ class HelpCog(commands.Cog):
                       "• `/list_devs` - List all developers (Dev only)\n"
                       "• `/whitelist_server` - Add a server to the whitelist (Dev only)\n"
                       "• `/remove_server` - Remove a server from the network (Dev only)\n"
-                      "• `/list_servers` - List all registered servers (Dev only)\n"
+                      "• `/list_servers` - List all servers the bot is currently in (Dev only)\n"
+                      "• `/registered_servers_list` - List all servers that have successfully registered in the network (Dev only)\n"
                       "• `/set_status` - Set the bot's status message (Dev only)\n"
                       "• `/dev_sync` - Sync a server's forum with the network (Dev only)\n"
                       "• `/approve` - Add a server to the whitelist (Dev only)\n"
-                      "• `/approved_list` - Show all approved (whitelisted) servers (Dev only)\n"
-                      "• `/sync_network` - Sync all whitelisted but unregistered servers to the network (Dev only)",
+                      "• `/approved_list` - Show all approved (whitelisted) servers (Dev only)",
                 inline=False
             )
 

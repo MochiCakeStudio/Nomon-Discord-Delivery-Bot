@@ -75,7 +75,6 @@ class HelpCog(commands.Cog):
             embed.add_field(
                 name="👨‍💻 Developer Commands",
                 value="• `/restart` - Restart the bot (Owner only)\n"
-                      "• `/servers` - Show all servers the bot is currently in (Dev only)\n"
                       "• `/add_dev` - Add a user to the dev list (Owner only)\n"
                       "• `/remove_dev` - Remove a user from the dev list (Owner only)\n"
                       "• `/list_devs` - List all developers (Dev only)\n"
@@ -84,7 +83,6 @@ class HelpCog(commands.Cog):
                       "• `/list_servers` - List all servers the bot is currently in (Dev only)\n"
                       "• `/registered_servers_list` - List all servers that have successfully registered in the network (Dev only)\n"
                       "• `/set_status` - Set the bot's status message (Dev only)\n"
-                      "• `/dev_sync` - Sync a server's forum with the network (Dev only)\n"
                       "• `/approve` - Add a server to the whitelist (Dev only)\n"
                       "• `/approved_list` - Show all approved (whitelisted) servers (Dev only)",
                 inline=False

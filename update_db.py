@@ -1,95 +1,23 @@
 import sqlite3
-import os
 
-# Ensure databases directory exists
-os.makedirs('databases', exist_ok=True)
+def migrate_bump_db():
+    db_path = 'databases/bump.db'
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
 
-conn = sqlite3.connect('databases/bump.db')
-cursor = conn.cursor()
+    # Get list of columns in partner_threads
+    cursor.execute("PRAGMA table_info(partner_threads)")
+    columns = [info[1] for info in cursor.fetchall()]
 
-# Add missing columns to servers table
-try:
-    cursor.execute('ALTER TABLE servers ADD COLUMN forum_channel_id INTEGER')
-except sqlite3.OperationalError:
-    pass  # Column might already exist
+    if 'last_bump_message_id' not in columns:
+        cursor.execute("ALTER TABLE partner_threads ADD COLUMN last_bump_message_id INTEGER")
 
-try:
-    cursor.execute('ALTER TABLE servers ADD COLUMN plan_type TEXT DEFAULT "affiliate"')
-except sqlite3.OperationalError:
-    pass
+    # Initialize last_bump_message_id to NULL for all rows (if needed)
+    cursor.execute("UPDATE partner_threads SET last_bump_message_id = NULL WHERE last_bump_message_id IS NULL")
 
-try:
-    cursor.execute('ALTER TABLE servers ADD COLUMN server_name TEXT')
-except sqlite3.OperationalError:
-    pass
+    conn.commit()
+    conn.close()
+    print("Database migration complete: Added 'last_bump_message_id' column to partner_threads table.")
 
-try:
-    cursor.execute('ALTER TABLE servers ADD COLUMN advertisement TEXT')
-except sqlite3.OperationalError:
-    pass
-
-try:
-    cursor.execute('ALTER TABLE servers ADD COLUMN tags TEXT')
-except sqlite3.OperationalError:
-    pass
-
-try:
-    cursor.execute('ALTER TABLE servers ADD COLUMN home_thread_id INTEGER')
-except sqlite3.OperationalError:
-    pass
-
-try:
-    cursor.execute('ALTER TABLE servers ADD COLUMN propagated_threads TEXT')  # JSON string
-except sqlite3.OperationalError:
-    pass
-
-try:
-    cursor.execute('ALTER TABLE servers ADD COLUMN last_bump_timestamp INTEGER DEFAULT 0')
-except sqlite3.OperationalError:
-    pass
-
-try:
-    cursor.execute('ALTER TABLE servers ADD COLUMN invite_url TEXT')
-except sqlite3.OperationalError:
-    pass
-
-# Create whitelisted_servers table
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS whitelisted_servers (
-        server_id INTEGER PRIMARY KEY
-    )
-''')
-
-# Create global_partner_threads table
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS global_partner_threads (
-        hosting_server_id INTEGER,
-        thread_id INTEGER,
-        advertised_server_id INTEGER,
-        PRIMARY KEY (hosting_server_id, advertised_server_id),
-        FOREIGN KEY (hosting_server_id) REFERENCES servers (server_id),
-        FOREIGN KEY (advertised_server_id) REFERENCES servers (server_id)
-    )
-''')
-
-# Create partner_servers table for GlobalPartnerRegistry
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS partner_servers (
-        guild_id INTEGER PRIMARY KEY
-    )
-''')
-
-# Create sync_logs table for Nomon logs
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS sync_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp INTEGER NOT NULL,
-        synced_count INTEGER DEFAULT 0,
-        errors_count INTEGER DEFAULT 0
-    )
-''')
-
-conn.commit()
-conn.close()
-
-print('Database updated successfully')
+if __name__ == "__main__":
+    migrate_bump_db()
